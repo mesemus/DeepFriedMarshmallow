@@ -11,7 +11,7 @@ from six import add_metaclass, exec_, iteritems, string_types, text_type
 
 from ..compat import is_overridden
 from ..utils import IndentedString
-from .plugins import iter_external_inliner_factories, iter_external_inliners
+from .plugins import iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
 
 # Regular Expression for identifying a valid Python identifier name.
 _VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
@@ -505,11 +505,16 @@ def generate_transform_method_body(schema, on_field, context):
                     body += f'del res["{result_key}"]'
 
             else:
-                serializer = on_field
-                if not _VALID_IDENTIFIER.match(attr_name):
-                    # If attr_name is not a valid python identifier, it can only
-                    # be accessed via key lookups.
-                    serializer = DictSerializer(context)
+                # at first try a specialized serializer
+                serializer = field_serializer_for_field(context, field_obj)
+
+                # if no specialized serializer is found, fall back to the default serializer
+                if serializer is None:
+                    serializer = on_field
+                    if not _VALID_IDENTIFIER.match(attr_name):
+                        # If attr_name is not a valid python identifier, it can only
+                        # be accessed via key lookups.
+                        serializer = DictSerializer(context)
 
                 body += serializer.serialize(attr_name, field_symbol, assignment_template, field_obj)
 
@@ -644,6 +649,15 @@ def inliner_for_field(context, field_obj):
             except Exception:
                 pass
         return inliner
+    return None
+
+def field_serializer_for_field(context, field_obj):
+    """Return a specialized field serializer for the given field object.
+    None is returned if no serializer is found.
+    """
+    for field_type, serializer_cls in iter_field_serializers():
+        if isinstance(field_obj, field_type):
+            return serializer_cls(context)
     return None
 
 
