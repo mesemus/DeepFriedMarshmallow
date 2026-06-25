@@ -49,7 +49,7 @@ def _inner_inliner(field_obj, context) -> str | tuple | None:
     return None
 
 
-def _dict_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: no cover
+def _dict_inliner_factory(field_obj, context) -> str | tuple | None:
     try:
         from marshmallow import fields
     except Exception:
@@ -58,17 +58,24 @@ def _dict_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
     if not isinstance(field_obj, fields.Dict):
         return None
 
-    key_field = getattr(field_obj, "keys", None)
-    val_field = getattr(field_obj, "values", None)
+    # marshmallow 3 stores key/value fields as key_field / value_field
+    key_field = getattr(field_obj, "key_field", None)
+    val_field = getattr(field_obj, "value_field", None)
 
     # Identity mapping if subfield is not provided
     key_inline = None
     val_inline = None
     if key_field is not None:
+        # If inner field has validators, fall back so they run
+        if getattr(key_field, "validators", None):
+            return None
         key_inline = _inner_inliner(key_field, context)
         if not key_inline:
             return None
     if val_field is not None:
+        # If inner field has validators, fall back so they run
+        if getattr(val_field, "validators", None):
+            return None
         val_inline = _inner_inliner(val_field, context)
         if not val_inline:
             return None
@@ -93,6 +100,17 @@ def _dict_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
 
     key_expr = _expr_or_identity(key_inline, "k")
     val_expr = _expr_or_identity(val_inline, "v")
+
+    # For deserialization, inner fields that don't allow None must reject None explicitly.
+    # StringInliner returns None for None input (relying on the outer JIT's None check),
+    # but inside a dict comprehension there is no such outer guard.
+    # The guard must come first so it isn't swallowed by the trailing ternary in the
+    # StringInliner expression ("… else dict()['error']" has lower precedence).
+    if not context.is_serializing:
+        if key_field is not None and not getattr(key_field, "allow_none", False):
+            key_expr = f"(dict()['error'] if k is None else ({key_expr}))"
+        if val_field is not None and not getattr(val_field, "allow_none", False):
+            val_expr = f"(dict()['error'] if v is None else ({val_expr}))"
 
     # Escape literal braces; leave {0} placeholders for JIT value substitution
     dict_expr = (
