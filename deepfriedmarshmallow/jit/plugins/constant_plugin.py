@@ -24,7 +24,9 @@ def _constant_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
     suffix = str(id(field_obj))
     sym = f"__dfm_const_{suffix}"
     context.namespace[sym] = getattr(
-        field_obj, "constant", getattr(field_obj, "_value", getattr(field_obj, "value", None))
+        field_obj,
+        "constant",
+        getattr(field_obj, "_value", getattr(field_obj, "value", None)),
     )
     if context.is_serializing:
         return sym

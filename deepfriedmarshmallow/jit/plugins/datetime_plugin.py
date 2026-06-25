@@ -21,7 +21,8 @@ def _jit_naive_datetime(value):
         return None
     result = _dt.datetime.fromisoformat(value)
     if result.tzinfo is not None:
-        raise ValueError("tz-aware datetime rejected for NaiveDateTime")
+        error_message = f"tz-aware datetime rejected for NaiveDateTime: {value=}"
+        raise ValueError(error_message)
     return result
 
 
@@ -34,7 +35,8 @@ def _jit_aware_datetime(value):
         return None
     result = _dt.datetime.fromisoformat(value)
     if result.tzinfo is None or result.tzinfo.utcoffset(result) is None:
-        raise ValueError("naive datetime rejected for AwareDateTime")
+        error_message = f"naive datetime rejected for AwareDateTime: {value=}"
+        raise ValueError(error_message)
     return result
 
 
