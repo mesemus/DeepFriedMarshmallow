@@ -11,7 +11,8 @@ from six import add_metaclass, exec_, iteritems, string_types, text_type
 
 from ..compat import is_overridden, has_overriden_serialization_method
 from ..utils import IndentedString
-from .plugins import iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
+from .plugins import iter_field_serializer_factories, iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
+from deepfriedmarshmallow.log import logger
 
 # Regular Expression for identifying a valid Python identifier name.
 _VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
@@ -631,6 +632,7 @@ def inliner_for_field(context, field_obj):
             except Exception:
                 continue
     except Exception:
+        logger.warning("Failed to load external inliners", exc_info=True)
         pass
 
     if context.use_inliners:
@@ -648,6 +650,7 @@ def inliner_for_field(context, field_obj):
                     if inliner:
                         break
             except Exception:
+                logger.warning("Failed to load external inliner", exc_info=True)
                 pass
         return inliner
     return None
@@ -659,6 +662,17 @@ def field_serializer_for_field(context, field_obj):
     for field_type, serializer_cls in iter_field_serializers():
         if isinstance(field_obj, field_type):
             return serializer_cls(context)
+
+    # Allow factory-based plugins to decide dynamically
+    try:  # pragma: no cover
+        for factory in iter_field_serializer_factories():
+            serializer = factory(field_obj, context)
+            if serializer:
+                return serializer
+    except Exception:
+        logger.warning("Failed to load field serializer", exc_info=True)
+        pass
+
     return None
 
 
