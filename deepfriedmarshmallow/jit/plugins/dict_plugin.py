@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+from deepfriedmarshmallow.compat import has_overriden_serialization_method
+
 from . import register_builtin_field_inliner_factory
 
 
@@ -56,6 +58,9 @@ def _dict_inliner_factory(field_obj, context) -> str | tuple | None:
         return None
 
     if not isinstance(field_obj, fields.Dict):
+        return None
+
+    if has_overriden_serialization_method(context.is_serializing, field_obj, fields.Dict):
         return None
 
     # marshmallow 3 stores key/value fields as key_field / value_field
@@ -113,16 +118,7 @@ def _dict_inliner_factory(field_obj, context) -> str | tuple | None:
             val_expr = f"(dict()['error'] if v is None else ({val_expr}))"
 
     # Escape literal braces; leave {0} placeholders for JIT value substitution
-    dict_expr = (
-        "dict(("
-        f"({key_expr}, {val_expr}) for (k, v) in ("
-        "{0}"
-        ").items())"
-        ")"
-        " if "
-        "{0}"
-        " is not None else None"
-    )
+    dict_expr = f"dict((({key_expr}, {val_expr}) for (k, v) in ({{0}}).items())) if {{0}} is not None else None"
     if imports:
         return (dict_expr, tuple(imports))
     return dict_expr

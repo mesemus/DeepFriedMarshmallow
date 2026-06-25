@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime as _dt
 from contextlib import suppress
 
+from deepfriedmarshmallow.compat import has_overriden_serialization_method
+
 from . import register_builtin_field_inliner_factory
 
 
@@ -43,12 +45,16 @@ def _datetime_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
         return None
 
     if isinstance(field_obj, fields.Date):
+        if has_overriden_serialization_method(context.is_serializing, field_obj, fields.Date):
+            return None
         if context.is_serializing:
             return "({0}.isoformat() if {0} is not None else None)"
         # Load path: date.fromisoformat
         return ("datetime.date.fromisoformat({0}) if {0} is not None else None", "datetime")
 
     if isinstance(field_obj, fields.NaiveDateTime):
+        if has_overriden_serialization_method(context.is_serializing, field_obj, fields.NaiveDateTime):
+            return None
         if context.is_serializing:
             return "({0}.isoformat() if {0} is not None else None)"
         # Inject helper; raises ValueError for tz-aware strings so the JIT
@@ -57,6 +63,8 @@ def _datetime_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
         return "_jit_naive_datetime({0})"
 
     if isinstance(field_obj, fields.AwareDateTime):
+        if has_overriden_serialization_method(context.is_serializing, field_obj, fields.AwareDateTime):
+            return None
         if context.is_serializing:
             return "({0}.isoformat() if {0} is not None else None)"
         # Same pattern as NaiveDateTime.
@@ -64,12 +72,16 @@ def _datetime_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
         return "_jit_aware_datetime({0})"
 
     if isinstance(field_obj, fields.DateTime):
+        if has_overriden_serialization_method(context.is_serializing, field_obj, fields.DateTime):
+            return None
         if context.is_serializing:
             return "({0}.isoformat() if {0} is not None else None)"
         # Load path: datetime.fromisoformat
         return ("datetime.datetime.fromisoformat({0}) if {0} is not None else None", "datetime")
 
     if isinstance(field_obj, fields.Time):
+        if has_overriden_serialization_method(context.is_serializing, field_obj, fields.Time):
+            return None
         if context.is_serializing:
             return "({0}.isoformat() if {0} is not None else None)"
         # Load path: time.fromisoformat

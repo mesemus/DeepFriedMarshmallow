@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+from deepfriedmarshmallow.compat import has_overriden_serialization_method
+
 from . import register_builtin_field_inliner_factory
 
 
@@ -56,6 +58,9 @@ def _list_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
         return None
 
     if not isinstance(field_obj, fields.List):
+        return None
+
+    if has_overriden_serialization_method(context.is_serializing, field_obj, fields.List):
         return None
 
     inner = getattr(field_obj, "inner", None)

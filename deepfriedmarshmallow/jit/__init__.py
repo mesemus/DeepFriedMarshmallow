@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import attr
 from six import add_metaclass, exec_, iteritems, string_types, text_type
 
-from ..compat import is_overridden
+from ..compat import is_overridden, has_overriden_serialization_method
 from ..utils import IndentedString
 from .plugins import iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
 
@@ -265,10 +265,7 @@ class StringInliner(FieldInliner):
         For example, generates "unicode(value) if value is not None else None"
         to serialize a string in Python 2.7
         """
-        if context.is_serializing:
-            if is_overridden(field._serialize, marshmallow.fields.String._serialize):
-                return None
-        elif is_overridden(field._deserialize, marshmallow.fields.String._deserialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.String):
             return None
 
         result = text_type.__name__ + "({0})"
@@ -290,7 +287,7 @@ class UUIDInliner(FieldInliner):
         # type: (marshmallow.fields.Field, JitContext) -> Optional[tuple]
 
         """Generates a template for inlining UUID serialization."""
-        if is_overridden(field._serialize, marshmallow.fields.UUID._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.UUID):
             return None
         if not context.is_serializing:
             result = "uuid.UUID({0})"
@@ -317,7 +314,7 @@ class BooleanInliner(FieldInliner):
 
         This is somewhat fragile but it tracks what Marshmallow does.
         """
-        if is_overridden(field._serialize, marshmallow.fields.Boolean._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Boolean):
             return None
         truthy_symbol = f"__{field.name}_truthy"
         falsy_symbol = f"__{field.name}_falsy"
@@ -338,7 +335,7 @@ class NumberInliner(FieldInliner):
         """
         if (
             is_overridden(field._validated, marshmallow.fields.Number._validated)
-            or is_overridden(field._serialize, marshmallow.fields.Number._serialize)
+            or has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Number)
             or field.num_type not in (int, float)
         ):
             return None
@@ -361,7 +358,7 @@ class NestedInliner(FieldInliner):  # pragma: no cover
         code expecting the context of nested schema to be populated on first
         access, so disabling for now.
         """
-        if is_overridden(field._serialize, marshmallow.fields.Nested._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Nested):
             return None
 
         if not (isinstance(field.nested, type) and issubclass(field.nested, marshmallow.SchemaABC)):

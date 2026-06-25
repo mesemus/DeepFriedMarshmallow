@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+from deepfriedmarshmallow.compat import has_overriden_serialization_method
+
 from . import register_builtin_field_inliner_factory
 
 
@@ -14,6 +16,9 @@ def _constant_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
         return None
 
     if not isinstance(field_obj, fields.Constant):
+        return None
+
+    if has_overriden_serialization_method(context.is_serializing, field_obj, fields.Constant):
         return None
 
     suffix = str(id(field_obj))
