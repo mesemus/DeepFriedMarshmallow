@@ -23,7 +23,16 @@ def _constant_inliner_factory(field_obj, context) -> str | tuple | None:  # prag
     )
     if context.is_serializing:
         return sym
-    return None
+
+    # Deserialize path: return the constant for any non-None input, None otherwise.
+    #
+    # For None input + allow_none=False: produces None in res, which the DFM-generated
+    # None-result check catches → raises ValueError → JIT fallback → marshmallow raises
+    # the correct ValidationError("Field may not be null.").
+    #
+    # For None input + allow_none=True: marshmallow short-circuits None without calling
+    # _deserialize, returning None as the field value.  Returning None here matches that.
+    return f"({sym} if {{0}} is not None else None)"
 
 
 def _register() -> None:
