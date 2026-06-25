@@ -1,3 +1,4 @@
+from random import sample
 import uuid
 
 from deepfriedmarshmallow import JitSchema, deep_fry_marshmallow
@@ -57,3 +58,13 @@ def test_boolean_inliner_truthy_falsy():
     assert s.load({"b": "true"})["b"] is True
     assert s.load({"b": "false"})["b"] is False
 
+
+def test_constant_inliner():
+    deep_fry_marshmallow()
+
+    class S(JitSchema):
+        b = fields.Constant("constant")
+
+    s = S()
+    assert s.load({"b": "constant"})["b"] == "constant"
+    assert s.dump({}) == {"b": "constant"}
