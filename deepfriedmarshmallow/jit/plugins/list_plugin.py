@@ -62,6 +62,10 @@ def _list_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
     if inner is None:
         return None
 
+    # If inner field has validators, they won't run inside the comprehension — fall back
+    if getattr(inner, "validators", None):
+        return None
+
     inner_inline = _inner_inliner(inner, context)
     if not inner_inline:
         return None
@@ -72,7 +76,14 @@ def _list_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
     else:
         expr, imports = inner_inline, ()
 
-    list_expr = f"[{expr.format('x')} for x in {{0}}] if {{0}} is not None else None"
+    inner_expr = expr.format("x")
+    # Reject str/bytes (iterable but not a collection) to match marshmallow's is_collection check.
+    # Non-iterables (e.g. int) raise TypeError inside the comprehension, also triggering fallback.
+    list_expr = (
+        f"[{inner_expr} for x in {{0}}]"
+        f" if ({{0}} is not None and not isinstance({{0}}, (str, bytes)))"
+        f" else (None if {{0}} is None else dict()['error'])"
+    )
     if imports:
         return (list_expr, imports)
     return list_expr
