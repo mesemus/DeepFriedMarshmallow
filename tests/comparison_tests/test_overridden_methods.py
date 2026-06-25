@@ -5,6 +5,7 @@ class, so any bypass of an override will cause a test failure.  The same schema
 instance is run first without DFM, then patched with DFM; the results must be
 identical.
 """
+
 from collections import namedtuple
 import datetime
 import decimal
@@ -32,6 +33,7 @@ UUID_3_OBJ = _uuid_mod.UUID(UUID_3_STR)
 
 ConstantSerializers = namedtuple("ConstantSerializers", ["serializer", "deserializer", "serializer_deserializer"])
 
+
 def make_constant_fields(base_class, serializer_value, deserializer_value):
     class SerializationMixin:
         def _serialize(self, value, attr, obj, **kwargs):
@@ -44,10 +46,29 @@ def make_constant_fields(base_class, serializer_value, deserializer_value):
             return deserializer_value
 
     return ConstantSerializers(
-        type(f"{base_class.__name__}ConstantSerializerDeserializer", (SerializationMixin, DeserializationMixin, base_class), {}),
-        type(f"{base_class.__name__}ConstantSerializer", (SerializationMixin, base_class,), {}),
-        type(f"{base_class.__name__}ConstantDeserializer", (DeserializationMixin, base_class,), {}),
+        type(
+            f"{base_class.__name__}ConstantSerializerDeserializer",
+            (SerializationMixin, DeserializationMixin, base_class),
+            {},
+        ),
+        type(
+            f"{base_class.__name__}ConstantSerializer",
+            (
+                SerializationMixin,
+                base_class,
+            ),
+            {},
+        ),
+        type(
+            f"{base_class.__name__}ConstantDeserializer",
+            (
+                DeserializationMixin,
+                base_class,
+            ),
+            {},
+        ),
     )
+
 
 CONSTANT_STRINGS = make_constant_fields(fields.String, "foo", "bar")
 CONSTANT_INTEGERS = make_constant_fields(fields.Integer, 42, 62)
@@ -56,22 +77,30 @@ CONSTANT_BOOLEANS = make_constant_fields(fields.Boolean, True, False)
 CONSTANT_BOOLEANS = make_constant_fields(fields.Boolean, True, False)
 CONSTANT_UUIDS = make_constant_fields(fields.UUID, UUID_1_OBJ, UUID_2_OBJ)
 CONSTANT_DATES = make_constant_fields(fields.Date, datetime.date(2023, 1, 1), datetime.date(2023, 12, 31))
-CONSTANT_DATETIMES = make_constant_fields(fields.DateTime, datetime.datetime(2023, 1, 1, 12, 23), datetime.datetime(2023, 12, 31, 11, 5))
-CONSTANT_TIMEDELTAS = make_constant_fields(fields.TimeDelta, datetime.timedelta(seconds=3600), datetime.timedelta(days=1))
+CONSTANT_DATETIMES = make_constant_fields(
+    fields.DateTime, datetime.datetime(2023, 1, 1, 12, 23), datetime.datetime(2023, 12, 31, 11, 5)
+)
+CONSTANT_TIMEDELTAS = make_constant_fields(
+    fields.TimeDelta, datetime.timedelta(seconds=3600), datetime.timedelta(days=1)
+)
 CONSTANT_DECIMALS = make_constant_fields(fields.Decimal, decimal.Decimal("3.14"), decimal.Decimal("2.71"))
 CONSTANT_LISTS = make_constant_fields(fields.List, ["foo1", "foo2"], ["bar1", "bar2"])
 CONSTANT_DICTS = make_constant_fields(fields.Dict, {"foo1": "bar1"}, {"foo2": "bar2"})
 CONSTANT_NESTED = make_constant_fields(fields.Nested, {"field": "bar1"}, {"field": "bar2"})
 
+
 class NestedSchema(Schema):
     field = fields.Str()
+
 
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _cmp(field, operation, value):
     """Run load/dump before and after DFM patching; assert outcomes are equal."""
+
     class S(Schema):
         fld = field
 
@@ -105,41 +134,61 @@ def _cmp(field, operation, value):
 
 _LOAD_CASES = [
     # --- string ---
-    pytest.param(CONSTANT_STRINGS, None, "hello",   id="string-valid"),
-    pytest.param(CONSTANT_INTEGERS, None, 5,          id="int-valid"),
-    pytest.param(CONSTANT_FLOATS, None, 5.0,           id="float-valid"),
-    pytest.param(CONSTANT_BOOLEANS, None, True,     id="boolean-true"),
-    pytest.param(CONSTANT_BOOLEANS, None, False,     id="boolean-false"),
-    pytest.param(CONSTANT_UUIDS, None, UUID_3_STR,     id="uuid-valid"),
-    pytest.param(CONSTANT_DATES, None, "1970-01-15",  id="date-valid"),
-    pytest.param(CONSTANT_DATETIMES, None, "1970-01-15T10:30:00",        id="dateTime-naive"),
-    pytest.param(CONSTANT_TIMEDELTAS, None, 2000,       id="timedelta-int"),
-    pytest.param(CONSTANT_DECIMALS, None, "-143",      id="decimal-str"),
-
+    pytest.param(CONSTANT_STRINGS, None, "hello", id="string-valid"),
+    pytest.param(CONSTANT_INTEGERS, None, 5, id="int-valid"),
+    pytest.param(CONSTANT_FLOATS, None, 5.0, id="float-valid"),
+    pytest.param(CONSTANT_BOOLEANS, None, True, id="boolean-true"),
+    pytest.param(CONSTANT_BOOLEANS, None, False, id="boolean-false"),
+    pytest.param(CONSTANT_UUIDS, None, UUID_3_STR, id="uuid-valid"),
+    pytest.param(CONSTANT_DATES, None, "1970-01-15", id="date-valid"),
+    pytest.param(CONSTANT_DATETIMES, None, "1970-01-15T10:30:00", id="dateTime-naive"),
+    pytest.param(CONSTANT_TIMEDELTAS, None, 2000, id="timedelta-int"),
+    pytest.param(CONSTANT_DECIMALS, None, "-143", id="decimal-str"),
     # --- List with overridden inner field ---
     pytest.param(CONSTANT_STRINGS, lambda cls: fields.List(cls), ["hello", "world"], id="list-string-valid"),
-
     # list with its own serializer/deserializer
-    pytest.param(CONSTANT_LISTS, lambda cls: cls(fields.Str), ["hello", "world"],      id="list-constant-str"),
-
-    pytest.param(CONSTANT_STRINGS, lambda cls: fields.Dict(keys=fields.String(), values=cls()), {"a": "hello", "b": "world"}, id="dict-string-value-valid",),
-    pytest.param(CONSTANT_STRINGS, lambda cls: fields.Dict(keys=cls(), values=fields.String()), {"a": "hello", "b": "world"}, id="dict-string-key-valid",),
-
-    pytest.param(CONSTANT_DICTS, lambda cls: cls(keys=fields.String(), values=fields.String()), {"a": "hello", "b": "world"},      id="dict-constant-str"),
-
-    pytest.param(CONSTANT_NESTED, lambda cls: cls(NestedSchema), {"field": "blah"}, id="nested-constant-str",),
+    pytest.param(CONSTANT_LISTS, lambda cls: cls(fields.Str), ["hello", "world"], id="list-constant-str"),
+    pytest.param(
+        CONSTANT_STRINGS,
+        lambda cls: fields.Dict(keys=fields.String(), values=cls()),
+        {"a": "hello", "b": "world"},
+        id="dict-string-value-valid",
+    ),
+    pytest.param(
+        CONSTANT_STRINGS,
+        lambda cls: fields.Dict(keys=cls(), values=fields.String()),
+        {"a": "hello", "b": "world"},
+        id="dict-string-key-valid",
+    ),
+    pytest.param(
+        CONSTANT_DICTS,
+        lambda cls: cls(keys=fields.String(), values=fields.String()),
+        {"a": "hello", "b": "world"},
+        id="dict-constant-str",
+    ),
+    pytest.param(
+        CONSTANT_NESTED,
+        lambda cls: cls(NestedSchema),
+        {"field": "blah"},
+        id="nested-constant-str",
+    ),
 ]
 
-@pytest.mark.parametrize("serializer_type", [
-    "serializer",
-    "deserializer",
-    "serializer_deserializer",
-])
+
+@pytest.mark.parametrize(
+    "serializer_type",
+    [
+        "serializer",
+        "deserializer",
+        "serializer_deserializer",
+    ],
+)
 @pytest.mark.parametrize("field, factory, value", _LOAD_CASES)
 def test_overridden_field_load(serializer_type, field, factory, value):
     if not factory:
         factory = lambda cls: cls()
     _cmp(factory(getattr(field, serializer_type)), "load", value)
+
 
 # ---------------------------------------------------------------------------
 # Dump (serialize) cases
@@ -148,36 +197,55 @@ def test_overridden_field_load(serializer_type, field, factory, value):
 
 _DUMP_CASES = [
     # --- string ---
-    pytest.param(CONSTANT_STRINGS, None, "hello",   id="string-valid"),
-    pytest.param(CONSTANT_INTEGERS, None, 5,          id="int-valid"),
-    pytest.param(CONSTANT_FLOATS, None, 5.0,           id="float-valid"),
-    pytest.param(CONSTANT_BOOLEANS, None, True,     id="boolean-true"),
-    pytest.param(CONSTANT_BOOLEANS, None, False,     id="boolean-false"),
-    pytest.param(CONSTANT_UUIDS, None, UUID_3_STR,     id="uuid-valid"),
-    pytest.param(CONSTANT_DATES, None, datetime.date.fromisoformat("1970-01-15"),  id="date-valid"),
-    pytest.param(CONSTANT_DATETIMES, None, datetime.datetime.fromisoformat("1970-01-15T10:30:00"),        id="dateTime-naive"),
-    pytest.param(CONSTANT_TIMEDELTAS, None, datetime.timedelta(seconds=8000),       id="timedelta-int"),
-    pytest.param(CONSTANT_DECIMALS, None, "-143",      id="decimal-str"),
-
+    pytest.param(CONSTANT_STRINGS, None, "hello", id="string-valid"),
+    pytest.param(CONSTANT_INTEGERS, None, 5, id="int-valid"),
+    pytest.param(CONSTANT_FLOATS, None, 5.0, id="float-valid"),
+    pytest.param(CONSTANT_BOOLEANS, None, True, id="boolean-true"),
+    pytest.param(CONSTANT_BOOLEANS, None, False, id="boolean-false"),
+    pytest.param(CONSTANT_UUIDS, None, UUID_3_STR, id="uuid-valid"),
+    pytest.param(CONSTANT_DATES, None, datetime.date.fromisoformat("1970-01-15"), id="date-valid"),
+    pytest.param(CONSTANT_DATETIMES, None, datetime.datetime.fromisoformat("1970-01-15T10:30:00"), id="dateTime-naive"),
+    pytest.param(CONSTANT_TIMEDELTAS, None, datetime.timedelta(seconds=8000), id="timedelta-int"),
+    pytest.param(CONSTANT_DECIMALS, None, "-143", id="decimal-str"),
     # --- List with overridden inner field ---
     pytest.param(CONSTANT_STRINGS, lambda cls: fields.List(cls), ["hello", "world"], id="list-string-valid"),
-
     # list with its own serializer/deserializer
-    pytest.param(CONSTANT_LISTS, lambda cls: cls(fields.Str), ["hello", "world"],      id="list-constant-str"),
-
-    pytest.param(CONSTANT_STRINGS, lambda cls: fields.Dict(keys=fields.String(), values=cls()), {"a": "hello", "b": "world"}, id="dict-string-value-valid",),
-    pytest.param(CONSTANT_STRINGS, lambda cls: fields.Dict(keys=cls(), values=fields.String()), {"a": "hello", "b": "world"}, id="dict-string-key-valid",),
-
-    pytest.param(CONSTANT_DICTS, lambda cls: cls(keys=fields.String(), values=fields.String()), {"a": "hello", "b": "world"},      id="dict-constant-str"),
-
-    pytest.param(CONSTANT_NESTED, lambda cls: cls(NestedSchema), {"field": "blah"}, id="nested-constant-str",),
+    pytest.param(CONSTANT_LISTS, lambda cls: cls(fields.Str), ["hello", "world"], id="list-constant-str"),
+    pytest.param(
+        CONSTANT_STRINGS,
+        lambda cls: fields.Dict(keys=fields.String(), values=cls()),
+        {"a": "hello", "b": "world"},
+        id="dict-string-value-valid",
+    ),
+    pytest.param(
+        CONSTANT_STRINGS,
+        lambda cls: fields.Dict(keys=cls(), values=fields.String()),
+        {"a": "hello", "b": "world"},
+        id="dict-string-key-valid",
+    ),
+    pytest.param(
+        CONSTANT_DICTS,
+        lambda cls: cls(keys=fields.String(), values=fields.String()),
+        {"a": "hello", "b": "world"},
+        id="dict-constant-str",
+    ),
+    pytest.param(
+        CONSTANT_NESTED,
+        lambda cls: cls(NestedSchema),
+        {"field": "blah"},
+        id="nested-constant-str",
+    ),
 ]
 
-@pytest.mark.parametrize("serializer_type", [
-    "serializer",
-    "deserializer",
-    "serializer_deserializer",
-])
+
+@pytest.mark.parametrize(
+    "serializer_type",
+    [
+        "serializer",
+        "deserializer",
+        "serializer_deserializer",
+    ],
+)
 @pytest.mark.parametrize("field, factory, value", _DUMP_CASES)
 def test_overridden_field_dump(serializer_type, field, factory, value):
     if not factory:

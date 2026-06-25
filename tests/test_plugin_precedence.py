@@ -9,8 +9,10 @@ def test_external_factory_precedes_builtin_raw(monkeypatch):
     before_ext = list(dfm_plugins._registry.field_inliner_factories)
     before_builtin = list(dfm_plugins._registry.builtin_field_inliner_factories)
     try:
+
         def factory(field_obj, context):
             from marshmallow import fields as f
+
             if isinstance(field_obj, f.Raw):
                 return "'X'"
             return None
@@ -28,4 +30,3 @@ def test_external_factory_precedes_builtin_raw(monkeypatch):
     finally:
         dfm_plugins._registry.field_inliner_factories = before_ext
         dfm_plugins._registry.builtin_field_inliner_factories = before_builtin
-
