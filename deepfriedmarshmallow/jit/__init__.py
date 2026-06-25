@@ -265,8 +265,12 @@ class StringInliner(FieldInliner):
         For example, generates "unicode(value) if value is not None else None"
         to serialize a string in Python 2.7
         """
-        if is_overridden(field._serialize, marshmallow.fields.String._serialize):
+        if context.is_serializing:
+            if is_overridden(field._serialize, marshmallow.fields.String._serialize):
+                return None
+        elif is_overridden(field._deserialize, marshmallow.fields.String._deserialize):
             return None
+
         result = text_type.__name__ + "({0})"
         result += " if {0} is not None else None"
         if not context.is_serializing:
