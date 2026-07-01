@@ -13,6 +13,7 @@ from ..compat import is_overridden, has_overriden_serialization_method
 from ..utils import IndentedString
 from .plugins import iter_field_serializer_factories, iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
 from deepfriedmarshmallow.log import logger
+from marshmallow import Schema
 
 # Regular Expression for identifying a valid Python identifier name.
 _VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")

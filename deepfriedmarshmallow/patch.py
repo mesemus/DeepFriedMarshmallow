@@ -12,6 +12,13 @@ def deep_fry_schema_object(schema: marshmallow.Schema) -> None:
     )
     schema._is_jit = True
 
+    # note: neither jit_options not dfm are automatically copied from Meta to opts
+    # (see marshmallow's SchemaOpts class) so we copy them manually
+    meta = getattr(schema, "Meta", None)
+    if meta is not None:
+        schema.opts.jit_options = getattr(meta, "jit_options", {})
+        schema.opts.dfm = getattr(meta, "dfm", {})
+
     schema._serialize = JitSerialize(schema)
     schema._deserialize = JitDeserialize(schema)
     schema.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow (via patch)"
@@ -29,6 +36,11 @@ def deep_fry_schema(cls: type[marshmallow.Schema]) -> None:
         super_init(self, *args, **kwargs)
         self._serialize = JitSerialize(self)
         self._deserialize = JitDeserialize(self)
+
+        meta = getattr(self, "Meta", None)
+        if meta is not None:
+            self.opts.jit_options = getattr(meta, "jit_options", {})
+            self.opts.dfm = getattr(meta, "dfm", {})
 
     cls.__init__ = new_init
     cls.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow (via patch)"
