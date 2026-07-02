@@ -16,7 +16,7 @@ from deepfriedmarshmallow.log import logger
 from marshmallow import Schema
 
 # Regular Expression for identifying a valid Python identifier name.
-_VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Field-level profiling controls
 FIELD_PROFILE_ENABLED = any(
