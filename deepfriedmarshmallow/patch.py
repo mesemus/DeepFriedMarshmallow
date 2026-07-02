@@ -34,13 +34,14 @@ def deep_fry_schema(cls: type[marshmallow.Schema]) -> None:
 
     def new_init(self, *args, **kwargs):
         super_init(self, *args, **kwargs)
-        self._serialize = JitSerialize(self)
-        self._deserialize = JitDeserialize(self)
 
         meta = getattr(self, "Meta", None)
         if meta is not None:
             self.opts.jit_options = getattr(meta, "jit_options", {})
             self.opts.dfm = getattr(meta, "dfm", {})
+
+        self._serialize = JitSerialize(self)
+        self._deserialize = JitDeserialize(self)
 
     cls.__init__ = new_init
     cls.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow (via patch)"
