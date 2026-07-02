@@ -460,6 +460,7 @@ _SOURCE_FACTORIES = [
         pytest.param(Method(deserialize="sample_deserialize", required=True), "hello", id="Method-required-valid"),
         pytest.param(Method(deserialize="sample_deserialize", required=True), None, id="Method-required-none"),
         pytest.param(Method(deserialize="identity", allow_none=True), None, id="Method-allow-none"),
+        pytest.param(Method(deserialize="identity", allow_none=True), "hello", id="Method-allow-none-non-null"),
         # to_int: parses string to int, raises ValueError for non-numeric
         pytest.param(Method(deserialize="to_int"), "42", id="Method-to-int-valid"),
         pytest.param(Method(deserialize="to_int"), "3", id="Method-to-int-valid-2"),

@@ -499,9 +499,14 @@ def generate_transform_method_body(schema, on_field, context):
                     value_key,
                 )
             if not field_obj._CHECK_ATTRIBUTE:
-                # fields like 'Method' expect to have `None` passed in when
-                # invoking their _serialize method.
-                body += assignment_template.format("None")
+                if context.is_serializing:
+                    # Method._serialize ignores the value parameter; it accesses obj directly.
+                    body += assignment_template.format("None")
+                else:
+                    # Method._deserialize receives the actual input value, not None.
+                    # During deserialization obj is always a Mapping.
+                    input_key = field_obj.data_key or field_name
+                    body += assignment_template.format(f'obj.get("{input_key}")')
                 context.namespace["__marshmallow_missing"] = marshmallow.missing
                 body += f'if res["{result_key}"] is __marshmallow_missing:'
                 with body.indent():
