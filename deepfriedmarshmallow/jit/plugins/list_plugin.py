@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+from deepfriedmarshmallow.compat import has_overriden_serialization_method
+
 from . import register_builtin_field_inliner_factory
 
 
@@ -58,8 +60,15 @@ def _list_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
     if not isinstance(field_obj, fields.List):
         return None
 
+    if has_overriden_serialization_method(context.is_serializing, field_obj, fields.List):
+        return None
+
     inner = getattr(field_obj, "inner", None)
     if inner is None:
+        return None
+
+    # If inner field has validators, they won't run inside the comprehension — fall back
+    if getattr(inner, "validators", None):
         return None
 
     inner_inline = _inner_inliner(inner, context)
@@ -72,7 +81,14 @@ def _list_inliner_factory(field_obj, context) -> str | tuple | None:  # pragma: 
     else:
         expr, imports = inner_inline, ()
 
-    list_expr = f"[{expr.format('x')} for x in {{0}}] if {{0}} is not None else None"
+    inner_expr = expr.format("x")
+    # Reject str/bytes (iterable but not a collection) to match marshmallow's is_collection check.
+    # Non-iterables (e.g. int) raise TypeError inside the comprehension, also triggering fallback.
+    list_expr = (
+        f"[{inner_expr} for x in {{0}}]"
+        f" if ({{0}} is not None and not isinstance({{0}}, (str, bytes)))"
+        f" else (None if {{0}} is None else dict()['error'])"
+    )
     if imports:
         return (list_expr, imports)
     return list_expr

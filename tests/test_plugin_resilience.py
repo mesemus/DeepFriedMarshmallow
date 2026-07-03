@@ -6,6 +6,7 @@ from marshmallow import fields
 def test_raising_factory_does_not_break_jit(monkeypatch):
     before = list(dfm_plugins._registry.field_inliner_factories)
     try:
+
         def raising_factory(field_obj, context):  # noqa: ARG001
             raise RuntimeError("boom")
 
@@ -23,4 +24,3 @@ def test_raising_factory_does_not_break_jit(monkeypatch):
         assert out == obj
     finally:
         dfm_plugins._registry.field_inliner_factories = before
-

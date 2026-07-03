@@ -30,4 +30,3 @@ def test_jit_deserialize_allows_unknown_exclude():
     data = s2.loads('{"invalid": "x", "a": 1}')
     assert data["a"] == 1
     assert "invalid" not in data
-

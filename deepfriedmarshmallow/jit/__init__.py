@@ -9,19 +9,20 @@ from dataclasses import dataclass
 import attr
 from six import add_metaclass, exec_, iteritems, string_types, text_type
 
-from ..compat import is_overridden
+from ..compat import is_overridden, has_overriden_serialization_method
 from ..utils import IndentedString
-from .plugins import iter_external_inliner_factories, iter_external_inliners
+from .plugins import iter_field_serializer_factories, iter_field_serializers, iter_external_inliner_factories, iter_external_inliners
+from deepfriedmarshmallow.log import logger
+from marshmallow import Schema
 
 # Regular Expression for identifying a valid Python identifier name.
-_VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Field-level profiling controls
 FIELD_PROFILE_ENABLED = any(
     os.getenv(v, "0").lower() in ("1", "true", "yes", "on") for v in ("DFM_FIELD_PROFILE", "DFM_PROFILE")
 )
 FIELD_PROFILE_STATS = {}
-
 
 @dataclass
 class MarshmallowCacheStore:
@@ -265,8 +266,9 @@ class StringInliner(FieldInliner):
         For example, generates "unicode(value) if value is not None else None"
         to serialize a string in Python 2.7
         """
-        if is_overridden(field._serialize, marshmallow.fields.String._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.String):
             return None
+
         result = text_type.__name__ + "({0})"
         result += " if {0} is not None else None"
         if not context.is_serializing:
@@ -286,7 +288,7 @@ class UUIDInliner(FieldInliner):
         # type: (marshmallow.fields.Field, JitContext) -> Optional[tuple]
 
         """Generates a template for inlining UUID serialization."""
-        if is_overridden(field._serialize, marshmallow.fields.UUID._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.UUID):
             return None
         if not context.is_serializing:
             result = "uuid.UUID({0})"
@@ -313,7 +315,7 @@ class BooleanInliner(FieldInliner):
 
         This is somewhat fragile but it tracks what Marshmallow does.
         """
-        if is_overridden(field._serialize, marshmallow.fields.Boolean._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Boolean):
             return None
         truthy_symbol = f"__{field.name}_truthy"
         falsy_symbol = f"__{field.name}_falsy"
@@ -334,7 +336,7 @@ class NumberInliner(FieldInliner):
         """
         if (
             is_overridden(field._validated, marshmallow.fields.Number._validated)
-            or is_overridden(field._serialize, marshmallow.fields.Number._serialize)
+            or has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Number)
             or field.num_type not in (int, float)
         ):
             return None
@@ -357,7 +359,7 @@ class NestedInliner(FieldInliner):  # pragma: no cover
         code expecting the context of nested schema to be populated on first
         access, so disabling for now.
         """
-        if is_overridden(field._serialize, marshmallow.fields.Nested._serialize):
+        if has_overriden_serialization_method(context.is_serializing, field, marshmallow.fields.Nested):
             return None
 
         if not (isinstance(field.nested, type) and issubclass(field.nested, marshmallow.SchemaABC)):
@@ -496,20 +498,30 @@ def generate_transform_method_body(schema, on_field, context):
                     value_key,
                 )
             if not field_obj._CHECK_ATTRIBUTE:
-                # fields like 'Method' expect to have `None` passed in when
-                # invoking their _serialize method.
-                body += assignment_template.format("None")
+                if context.is_serializing:
+                    # Method._serialize ignores the value parameter; it accesses obj directly.
+                    body += assignment_template.format("None")
+                else:
+                    # Method._deserialize receives the actual input value, not None.
+                    # During deserialization obj is always a Mapping.
+                    input_key = field_obj.data_key or field_name
+                    body += assignment_template.format(f'obj.get("{input_key}")')
                 context.namespace["__marshmallow_missing"] = marshmallow.missing
                 body += f'if res["{result_key}"] is __marshmallow_missing:'
                 with body.indent():
                     body += f'del res["{result_key}"]'
 
             else:
-                serializer = on_field
-                if not _VALID_IDENTIFIER.match(attr_name):
-                    # If attr_name is not a valid python identifier, it can only
-                    # be accessed via key lookups.
-                    serializer = DictSerializer(context)
+                # at first try a specialized serializer
+                serializer = field_serializer_for_field(context, field_obj)
+
+                # if no specialized serializer is found, fall back to the default serializer
+                if serializer is None:
+                    serializer = on_field
+                    if not _VALID_IDENTIFIER.match(attr_name):
+                        # If attr_name is not a valid python identifier, it can only
+                        # be accessed via key lookups.
+                        serializer = DictSerializer(context)
 
                 body += serializer.serialize(attr_name, field_symbol, assignment_template, field_obj)
 
@@ -625,6 +637,7 @@ def inliner_for_field(context, field_obj):
             except Exception:
                 continue
     except Exception:
+        logger.warning("Failed to load external inliners", exc_info=True)
         pass
 
     if context.use_inliners:
@@ -642,8 +655,29 @@ def inliner_for_field(context, field_obj):
                     if inliner:
                         break
             except Exception:
+                logger.warning("Failed to load external inliner", exc_info=True)
                 pass
         return inliner
+    return None
+
+def field_serializer_for_field(context, field_obj):
+    """Return a specialized field serializer for the given field object.
+    None is returned if no serializer is found.
+    """
+    for field_type, serializer_cls in iter_field_serializers():
+        if isinstance(field_obj, field_type):
+            return serializer_cls(context)
+
+    # Allow factory-based plugins to decide dynamically
+    try:  # pragma: no cover
+        for factory in iter_field_serializer_factories():
+            serializer = factory(field_obj, context)
+            if serializer:
+                return serializer
+    except Exception:
+        logger.warning("Failed to load field serializer", exc_info=True)
+        pass
+
     return None
 
 

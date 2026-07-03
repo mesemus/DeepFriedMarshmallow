@@ -19,6 +19,7 @@ def test_auto_discovery_registers_factory(monkeypatch):
     class Ep:
         def load(self):
             import deepfriedmarshmallow.tests_dummy_plugin as mod
+
             return mod
 
     class Eps:

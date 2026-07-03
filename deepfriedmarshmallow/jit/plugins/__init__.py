@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from typing import Any
 
-
 @dataclass
 class PluginRegistry:
     """Global registry for DeepFriedMarshmallow JIT plugins.
@@ -23,6 +22,14 @@ class PluginRegistry:
     builtin_field_inliners: list[tuple[type[Any], type[Any]]] = field(default_factory=list)
     builtin_field_inliner_factories: list[Callable[[Any, Any], Any | None]] = field(default_factory=list)
 
+    # Field serializers are used to serialize fields on objects, for example
+    # a DictSerializer (accessing item of a dict instance) or InstanceSerializer (using dot notation/getattr).
+    #
+    # Maps field type to a FieldSerializer class. If a field serializer is found, it is used in place of
+    # the default FieldSerializer.
+    field_serializers: list[tuple[type[Any], type[Any]]] = field(default_factory=list)
+    field_serializer_factories: list[Callable[[Any, Any], Any | None]] = field(default_factory=list)
+
     def register_field_inliner(self, field_type: type[Any], inliner_cls: type[Any]) -> None:
         self.field_inliners.append((field_type, inliner_cls))
 
@@ -34,6 +41,12 @@ class PluginRegistry:
 
     def register_builtin_field_inliner_factory(self, factory: Callable[[Any, Any], Any | None]) -> None:
         self.builtin_field_inliner_factories.append(factory)
+
+    def register_field_serializer(self, field_type: type[Any], field_serializer_cls: type[Any]) -> None:
+        self.field_serializers.append((field_type, field_serializer_cls))
+
+    def register_field_serializer_factory(self, factory: Callable[[Any, Any], Any | None]) -> None:
+        self.field_serializer_factories.append(factory)
 
 
 _registry = PluginRegistry()
@@ -55,6 +68,14 @@ def register_builtin_field_inliner_factory(factory: Callable[[Any, Any], Any | N
     _registry.register_builtin_field_inliner_factory(factory)
 
 
+def register_field_serializer(field_type: type[Any], accessor_cls: type[Any]) -> None:
+    _registry.register_field_serializer(field_type, accessor_cls)
+
+def register_field_serializer_factory(factory: Callable[[Any, Any], Any | None]) -> None:
+    _registry.register_field_serializer_factory(factory)
+
+
+
 def iter_external_inliners() -> Iterable[tuple[type[Any], type[Any]]]:
     # For fixed-type inliners, insertion order in jit determines override
     return list(_registry.builtin_field_inliners) + list(_registry.field_inliners)
@@ -63,6 +84,12 @@ def iter_external_inliners() -> Iterable[tuple[type[Any], type[Any]]]:
 def iter_external_inliner_factories() -> Iterable[Callable[[Any, Any], Any | None]]:
     return list(_registry.field_inliner_factories) + list(_registry.builtin_field_inliner_factories)
 
+
+def iter_field_serializers() -> Iterable[tuple[type[Any], type[Any]]]:
+    return list(_registry.field_serializers)
+
+def iter_field_serializer_factories() -> Iterable[Callable[[Any, Any], Any | None]]:
+    return list(_registry.field_serializer_factories)
 
 def _load_from_string(spec: str) -> Any:
     module_name, _, attr = spec.partition(":")

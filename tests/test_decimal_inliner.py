@@ -29,4 +29,3 @@ def test_decimal_with_constraints_falls_back():
     assert str(loaded["x"]) in ("12.35", "12.34", str(loaded["x"]))
     dumped = s.dump(loaded)
     assert isinstance(dumped["x"], str)
-

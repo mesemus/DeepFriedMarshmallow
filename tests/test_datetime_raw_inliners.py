@@ -40,4 +40,3 @@ def test_raw_inliner_passthrough():
     assert loaded == obj
     dumped = s.dump(loaded)
     assert dumped == obj
-

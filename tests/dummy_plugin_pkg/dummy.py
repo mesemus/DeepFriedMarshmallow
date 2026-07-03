@@ -8,4 +8,3 @@ def dfm_register(registry) -> None:
         return None
 
     registry.register_field_inliner_factory(factory)
-

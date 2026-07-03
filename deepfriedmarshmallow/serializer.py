@@ -8,6 +8,8 @@ from deepfriedmarshmallow.jit import (
 )
 from deepfriedmarshmallow.log import logger
 
+NO_FALLBACK_ON_ERROR = os.getenv("DFM_NO_FALLBACK_ON_ERROR", "0").lower() in ("1", "true", "yes", "on")
+
 
 class JitMethodWrapper:
     def __init__(self, schema, method):
@@ -25,6 +27,9 @@ class JitMethodWrapper:
             result = self._jit_method(obj, many=many)
             logger.debug(f"JIT method succeeded for {obj.__class__.__name__}")
         except Exception as e:
+            if NO_FALLBACK_ON_ERROR and self._jit_method is not None:
+                logger.error(f"JIT method was generated but failed: {e}", exc_info=e)
+                raise
             logger.warning(f"JIT method failed, falling back to non-JIT method: {e}", exc_info=e)
             result = self._method(obj, many=many, **kwargs)
             logger.debug(f"Fallback method succeeded for {obj.__class__.__name__}")

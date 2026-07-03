@@ -92,6 +92,16 @@ def simple_hybrid():
 
     return HybridObject()
 
+@pytest.fixture()
+def schema_from_dict():
+    schema_dict = {
+        "blah:field": fields.Integer()
+    }
+    return Schema.from_dict(schema_dict)()
+
+@pytest.fixture()
+def valid_from_dict_data():
+    return {"blah:field": 42}
 
 @pytest.fixture()
 def schema():
@@ -454,4 +464,16 @@ def test_nested_serialize_method(nested_schema):
             {"name": "second_child"},
         ],
     }
+    assert expected == result
+
+def test_serialize_method_from_dict(schema_from_dict, valid_from_dict_data):
+    serialize_method = generate_serialize_method(schema_from_dict)
+    result = serialize_method(valid_from_dict_data)
+    expected = valid_from_dict_data
+    assert expected == result
+
+def test_deserialize_method_from_dict(schema_from_dict, valid_from_dict_data):
+    deserialize_method = generate_deserialize_method(schema_from_dict)
+    result = deserialize_method(valid_from_dict_data)
+    expected = valid_from_dict_data
     assert expected == result

@@ -28,4 +28,3 @@ def test_dfm_use_inliners_false_disables_builtins_for_dict_and_tuple(monkeypatch
     dumped_off = s_off.dump(loaded_off)
     dumped_on = s_on.dump(loaded_on)
     assert dumped_off == dumped_on
-
