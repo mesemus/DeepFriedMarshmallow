@@ -24,7 +24,6 @@ FIELD_PROFILE_ENABLED = any(
 )
 FIELD_PROFILE_STATS = {}
 
-
 @dataclass
 class MarshmallowCacheStore:
     _Schema = None
